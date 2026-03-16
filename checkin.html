@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phone Check-In — IESV</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --success: #00e676;
+    --warning: #ffb300;
+    --text: #e8edf5;
+    --text-dim: #6b7a99;
+    --text-muted: #3a4560;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100vh; }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10,14,26,0.9);
+    backdrop-filter: blur(10px);
+    flex-shrink: 0;
+  }
+
+  .logo {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 900;
+    font-size: 1.4rem;
+    letter-spacing: 0.05em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .logo span { color: var(--text-dim); font-weight: 300; }
+
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+
+  .stat-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .stat-badge .num {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text);
+  }
+
+  .stat-badge.outstanding .num { color: var(--warning); }
+  .stat-badge.handed-in .num { color: var(--success); }
+
+  .pulse-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  /* MAIN LAYOUT */
+  .main {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* LEFT PANEL - Input */
+  .input-panel {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    gap: 20px;
+    overflow-y: auto;
+  }
+
+  .panel-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+
+  /* Locker input */
+  .locker-display {
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    transition: border-color 0.2s;
+  }
+
+  .locker-display.active { border-color: var(--accent); }
+  .locker-display.match { border-color: var(--success); }
+  .locker-display.nomatch { border-color: var(--accent2); }
+
+  .locker-number {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 900;
+    font-size: 3.5rem;
+    letter-spacing: 0.05em;
+    color: var(--text);
+    line-height: 1;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+  }
+
+  .locker-number .cursor {
+    display: inline-block;
+    width: 3px;
+    height: 48px;
+    background: var(--accent);
+    margin-left: 4px;
+    animation: blink 1s infinite;
+    border-radius: 2px;
+  }
+
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+  .locker-hint {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+
+  /* Name preview */
+  .name-preview {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    min-height: 90px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .name-preview.visible {
+    border-color: var(--success);
+    background: rgba(0,230,118,0.04);
+  }
+
+  .name-preview.no-match {
+    border-color: var(--accent2);
+    background: rgba(255,107,53,0.04);
+  }
+
+  .preview-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 1.6rem;
+    color: var(--text);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.2s;
+  }
+
+  .name-preview.visible .preview-name {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .preview-class {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-top: 4px;
+    opacity: 0;
+    transition: opacity 0.2s 0.1s;
+  }
+
+  .name-preview.visible .preview-class { opacity: 1; }
+
+  .no-match-msg {
+    font-size: 0.9rem;
+    color: var(--accent2);
+    display: none;
+  }
+
+  .name-preview.no-match .no-match-msg { display: block; }
+
+  /* Current status badge */
+  .current-status {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-top: 6px;
+  }
+
+  .current-status.show { display: flex; }
+  .current-status.handed-in { background: rgba(0,230,118,0.1); color: var(--success); border: 1px solid rgba(0,230,118,0.2); }
+  .current-status.not-handed-in { background: rgba(255,179,0,0.1); color: var(--warning); border: 1px solid rgba(255,179,0,0.2); }
+
+  /* Action buttons */
+  .action-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .btn {
+    padding: 14px 12px;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    transform: none !important;
+  }
+
+  .btn:not(:disabled):hover { transform: translateY(-2px); }
+  .btn:not(:disabled):active { transform: translateY(0); }
+
+  .btn-handin {
+    background: var(--success);
+    color: #001a0d;
+  }
+
+  .btn-collect {
+    background: var(--accent);
+    color: #001a26;
+  }
+
+  .btn-clear {
+    grid-column: 1 / -1;
+    background: var(--surface2);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    font-size: 0.85rem;
+    padding: 10px;
+  }
+
+  /* Numpad */
+  .numpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .num-key {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 8px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.1s;
+    text-align: center;
+    user-select: none;
+  }
+
+  .num-key:hover { background: var(--border); border-color: var(--accent); color: var(--accent); }
+  .num-key:active { transform: scale(0.95); background: var(--accent); color: var(--bg); }
+
+  .num-key.backspace { font-size: 1.1rem; color: var(--text-dim); }
+  .num-key.enter-key {
+    background: rgba(0,212,255,0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 28px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 1.3rem;
+    letter-spacing: 0.05em;
+    z-index: 100;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    text-align: center;
+    min-width: 280px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--success); color: var(--success); }
+  .toast.info { border-color: var(--accent); color: var(--accent); }
+  .toast.error { border-color: var(--accent2); color: var(--accent2); }
+
+  .toast-sub {
+    font-family: 'Barlow', sans-serif;
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  /* RIGHT PANEL - Class lists */
+  .class-panel {
+    overflow-y: auto;
+    padding: 20px;
+    background: var(--bg);
+  }
+
+  .class-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .filter-btn {
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font-family: 'Barlow', sans-serif;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .filter-btn:hover, .filter-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
+
+  .toggle-done {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .toggle-done input { cursor: pointer; accent-color: var(--accent); }
+
+  /* Class groups */
+  .classes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+  }
+
+  .class-group {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .class-header {
+    padding: 10px 14px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .class-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+    color: var(--text);
+  }
+
+  .class-count {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+
+  .class-count .remaining { color: var(--warning); font-weight: 600; }
+
+  .student-list { padding: 8px 0; }
+
+  .student-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    transition: background 0.15s;
+    gap: 8px;
+  }
+
+  .student-row:hover { background: var(--surface2); }
+
+  .student-row.handed-in {
+    opacity: 0.35;
+  }
+
+  .student-row.hidden-done { display: none; }
+
+  .student-row.highlight {
+    background: rgba(0,212,255,0.08);
+    border-left: 3px solid var(--accent);
+  }
+
+  .student-name-text {
+    font-size: 0.85rem;
+    color: var(--text);
+    flex: 1;
+  }
+
+  .student-locker {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    min-width: 28px;
+    text-align: right;
+  }
+
+  .status-icon {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--text-muted);
+  }
+
+  .student-row.handed-in .status-icon { background: var(--success); }
+
+  /* Loading state */
+  .loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    gap: 16px;
+    transition: opacity 0.5s;
+  }
+
+  .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  @media (max-width: 768px) {
+    .main { grid-template-columns: 1fr; }
+    .class-panel { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading student data...</div>
+</div>
+
+<div class="app">
+  <header>
+    <div class="logo">IESV <span>/ Phone Check-In</span></div>
+    <div class="header-status">
+      <div class="stat-badge handed-in">
+        <div class="pulse-dot"></div>
+        <span>Handed in:</span>
+        <span class="num" id="countHandedIn">0</span>
+      </div>
+      <div class="stat-badge outstanding">
+        <span>Outstanding:</span>
+        <span class="num" id="countOutstanding">0</span>
+      </div>
+      <a href="admin.html" style="font-size:0.75rem; color:var(--text-dim); text-decoration:none; padding:4px 10px; border:1px solid var(--border); border-radius:4px;">Admin →</a>
+    </div>
+  </header>
+
+  <div class="main">
+    <!-- LEFT: Input Panel -->
+    <div class="input-panel">
+      <div>
+        <div class="panel-title">Locker Number</div>
+        <div class="locker-display" id="lockerDisplay">
+          <div class="locker-number" id="lockerNumber">
+            <span class="cursor"></span>
+          </div>
+          <div class="locker-hint">Type your locker number, then press Enter</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel-title">Student</div>
+        <div class="name-preview" id="namePreview">
+          <div class="preview-name" id="previewName">—</div>
+          <div class="preview-class" id="previewClass"></div>
+          <div class="no-match-msg">No student found for this locker</div>
+          <div class="current-status" id="currentStatus"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel-title">Action</div>
+        <div class="action-buttons">
+          <button class="btn btn-handin" id="btnHandIn" disabled onclick="submitAction('HAND_IN')">
+            📱 Hand In
+          </button>
+          <button class="btn btn-collect" id="btnCollect" disabled onclick="submitAction('COLLECT')">
+            ✋ Collect
+          </button>
+          <button class="btn btn-clear" onclick="clearInput()">⌫ Clear</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel-title">Keypad</div>
+        <div class="numpad">
+          <div class="num-key" onclick="addDigit('1')">1</div>
+          <div class="num-key" onclick="addDigit('2')">2</div>
+          <div class="num-key" onclick="addDigit('3')">3</div>
+          <div class="num-key" onclick="addDigit('4')">4</div>
+          <div class="num-key" onclick="addDigit('5')">5</div>
+          <div class="num-key" onclick="addDigit('6')">6</div>
+          <div class="num-key" onclick="addDigit('7')">7</div>
+          <div class="num-key" onclick="addDigit('8')">8</div>
+          <div class="num-key" onclick="addDigit('9')">9</div>
+          <div class="num-key backspace" onclick="backspace()">⌫</div>
+          <div class="num-key" onclick="addDigit('0')">0</div>
+          <div class="num-key enter-key" onclick="handleEnter()">↵</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Class Lists -->
+    <div class="class-panel">
+      <div class="class-panel-header">
+        <div class="filter-bar" id="filterBar">
+          <button class="filter-btn active" onclick="filterClass('ALL', this)">All</button>
+        </div>
+        <label class="toggle-done">
+          <input type="checkbox" id="toggleDone" onchange="toggleShowDone()"> Hide handed-in
+        </label>
+      </div>
+      <div class="classes-grid" id="classesGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <div id="toastMsg"></div>
+  <div class="toast-sub" id="toastSub"></div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG — replace with your deployed Apps Script URL
+// ============================================================
+const RELAY_URL = 'YOUR_RELAY_URL_HERE';
+
+// ============================================================
+let students = [];       // { locker, name, class }
+let handedIn = new Set(); // locker numbers currently handed in (from today's log)
+let currentInput = '';
+let matchedStudent = null;
+let hideDone = false;
+let activeFilter = 'ALL';
+let toastTimer = null;
+
+// ============================================================
+// INIT
+// ============================================================
+async function init() {
+  await loadStudents();
+  await loadTodayStatus();
+  renderClassLists();
+  updateCounts();
+  hideLoading();
+  document.addEventListener('keydown', onKeyDown);
+}
+
+async function loadStudents() {
+  const res = await fetch(`${RELAY_URL}?action=students`);
+  const data = await res.json();
+  students = data.students || [];
+}
+
+async function loadTodayStatus() {
+  try {
+    const res = await fetch(`${RELAY_URL}?action=log`);
+    const data = await res.json();
+    const log = data.log || [];
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Replay log to find current state per locker
+    const stateMap = {};
+    log.forEach(entry => {
+      if (entry.Timestamp && entry.Timestamp.slice(0, 10) === today) {
+        stateMap[parseInt(entry.Locker)] = entry.Action;
+      }
+    });
+
+    handedIn = new Set(
+      Object.entries(stateMap)
+        .filter(([, action]) => action === 'HAND_IN')
+        .map(([locker]) => parseInt(locker))
+    );
+  } catch (e) {
+    console.warn('Could not load log:', e);
+  }
+}
+
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.add('hidden');
+}
+
+// ============================================================
+// INPUT HANDLING
+// ============================================================
+function addDigit(d) {
+  if (currentInput.length >= 3) return;
+  currentInput += d;
+  updateDisplay();
+}
+
+function backspace() {
+  currentInput = currentInput.slice(0, -1);
+  updateDisplay();
+}
+
+function clearInput() {
+  currentInput = '';
+  matchedStudent = null;
+  updateDisplay();
+}
+
+function handleEnter() {
+  if (matchedStudent) {
+    // Auto-determine action: if handed in → collect, else → hand in
+    const loc = matchedStudent.locker;
+    if (handedIn.has(loc)) {
+      submitAction('COLLECT');
+    } else {
+      submitAction('HAND_IN');
+    }
+  }
+}
+
+function onKeyDown(e) {
+  if (e.key >= '0' && e.key <= '9') addDigit(e.key);
+  else if (e.key === 'Backspace') backspace();
+  else if (e.key === 'Enter') handleEnter();
+  else if (e.key === 'Escape') clearInput();
+}
+
+function updateDisplay() {
+  const numEl = document.getElementById('lockerNumber');
+  const displayEl = document.getElementById('lockerDisplay');
+
+  // Show typed digits
+  const typed = currentInput;
+  numEl.innerHTML = typed
+    ? `${typed}<span class="cursor"></span>`
+    : `<span class="cursor"></span>`;
+
+  // Match student
+  matchedStudent = null;
+  if (typed.length > 0) {
+    const num = parseInt(typed);
+    matchedStudent = students.find(s => s.locker === num) || null;
+  }
+
+  updateNamePreview();
+  updateActionButtons();
+  highlightStudent();
+
+  // Border state
+  displayEl.className = 'locker-display';
+  if (typed.length === 0) displayEl.classList.add('');
+  else if (matchedStudent) displayEl.classList.add('match');
+  else displayEl.classList.add('nomatch');
+}
+
+function updateNamePreview() {
+  const preview = document.getElementById('namePreview');
+  const nameEl = document.getElementById('previewName');
+  const classEl = document.getElementById('previewClass');
+  const statusEl = document.getElementById('currentStatus');
+
+  preview.className = 'name-preview';
+  statusEl.className = 'current-status';
+
+  if (!currentInput) {
+    nameEl.textContent = '—';
+    classEl.textContent = '';
+    return;
+  }
+
+  if (matchedStudent) {
+    preview.classList.add('visible');
+    nameEl.textContent = matchedStudent.name;
+    classEl.textContent = `Class ${matchedStudent.class} · Locker ${matchedStudent.locker}`;
+
+    // Show current status
+    const isIn = handedIn.has(matchedStudent.locker);
+    statusEl.classList.add('show', isIn ? 'handed-in' : 'not-handed-in');
+    statusEl.textContent = isIn ? '✓ Phone currently handed in' : '⚠ Phone not yet handed in';
+  } else {
+    preview.classList.add('no-match');
+    nameEl.textContent = '';
+    classEl.textContent = '';
+  }
+}
+
+function updateActionButtons() {
+  const btnIn = document.getElementById('btnHandIn');
+  const btnCollect = document.getElementById('btnCollect');
+  const hasMatch = !!matchedStudent;
+  btnIn.disabled = !hasMatch;
+  btnCollect.disabled = !hasMatch;
+}
+
+function highlightStudent() {
+  document.querySelectorAll('.student-row').forEach(r => r.classList.remove('highlight'));
+  if (matchedStudent) {
+    const row = document.querySelector(`[data-locker="${matchedStudent.locker}"]`);
+    if (row) row.classList.add('highlight');
+  }
+}
+
+// ============================================================
+// SUBMIT
+// ============================================================
+async function submitAction(action) {
+  if (!matchedStudent) return;
+
+  const student = matchedStudent;
+  const locker = student.locker;
+
+  // Optimistic update
+  if (action === 'HAND_IN') {
+    handedIn.add(locker);
+  } else {
+    handedIn.delete(locker);
+  }
+
+  updateStudentRow(locker);
+  updateCounts();
+
+  const label = action === 'HAND_IN' ? 'Phone handed in' : 'Phone collected';
+  showToast(`${student.name}`, label, action === 'HAND_IN' ? 'success' : 'info');
+
+  clearInput();
+
+  // Write to log
+  try {
+    await fetch(RELAY_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        locker: locker,
+        name: student.name,
+        class: student.class,
+        action: action
+      })
+    });
+  } catch (e) {
+    showToast('Network error', 'Log write failed', 'error');
+  }
+}
+
+// ============================================================
+// CLASS LIST RENDERING
+// ============================================================
+function renderClassLists() {
+  const grid = document.getElementById('classesGrid');
+  const filterBar = document.getElementById('filterBar');
+
+  // Group by class
+  const classes = {};
+  students.forEach(s => {
+    if (!classes[s.class]) classes[s.class] = [];
+    classes[s.class].push(s);
+  });
+
+  const sortedClasses = Object.keys(classes).sort();
+
+  // Build filter buttons
+  filterBar.innerHTML = `<button class="filter-btn active" onclick="filterClass('ALL', this)">All</button>`;
+  sortedClasses.forEach(cls => {
+    filterBar.innerHTML += `<button class="filter-btn" onclick="filterClass('${cls}', this)">${cls}</button>`;
+  });
+
+  // Build class cards
+  grid.innerHTML = '';
+  sortedClasses.forEach(cls => {
+    const group = document.createElement('div');
+    group.className = 'class-group';
+    group.dataset.class = cls;
+
+    const studentRows = classes[cls].map(s => `
+      <div class="student-row ${handedIn.has(s.locker) ? 'handed-in' : ''}"
+           data-locker="${s.locker}" data-class="${s.class}">
+        <div class="status-icon"></div>
+        <div class="student-name-text">${s.name}</div>
+        <div class="student-locker">${s.locker}</div>
+      </div>
+    `).join('');
+
+    group.innerHTML = `
+      <div class="class-header">
+        <div class="class-name">${cls}</div>
+        <div class="class-count">
+          <span class="remaining" id="remaining-${cls}">${classes[cls].length}</span>/${classes[cls].length}
+        </div>
+      </div>
+      <div class="student-list">${studentRows}</div>
+    `;
+
+    grid.appendChild(group);
+  });
+
+  applyFilter();
+}
+
+function updateStudentRow(locker) {
+  const row = document.querySelector(`[data-locker="${locker}"]`);
+  if (!row) return;
+
+  if (handedIn.has(locker)) {
+    row.classList.add('handed-in');
+  } else {
+    row.classList.remove('handed-in');
+  }
+
+  if (hideDone) {
+    row.classList.toggle('hidden-done', handedIn.has(locker));
+  }
+
+  // Update class remaining count
+  const cls = row.dataset.class;
+  updateClassCount(cls);
+}
+
+function updateClassCount(cls) {
+  const rows = document.querySelectorAll(`[data-class="${cls}"]`);
+  const remaining = Array.from(rows).filter(r => !handedIn.has(parseInt(r.dataset.locker))).length;
+  const el = document.getElementById(`remaining-${cls}`);
+  if (el) el.textContent = remaining;
+}
+
+function updateCounts() {
+  document.getElementById('countHandedIn').textContent = handedIn.size;
+  document.getElementById('countOutstanding').textContent = students.length - handedIn.size;
+}
+
+function toggleShowDone() {
+  hideDone = document.getElementById('toggleDone').checked;
+  document.querySelectorAll('.student-row').forEach(row => {
+    const locker = parseInt(row.dataset.locker);
+    row.classList.toggle('hidden-done', hideDone && handedIn.has(locker));
+  });
+}
+
+function filterClass(cls, btn) {
+  activeFilter = cls;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilter();
+}
+
+function applyFilter() {
+  document.querySelectorAll('.class-group').forEach(group => {
+    group.style.display = (activeFilter === 'ALL' || group.dataset.class === activeFilter) ? '' : 'none';
+  });
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg, sub, type = 'success') {
+  const toast = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  document.getElementById('toastSub').textContent = sub;
+  toast.className = `toast show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// ============================================================
+// START
+// ============================================================
+init();
+</script>
+</body>
+</html>
